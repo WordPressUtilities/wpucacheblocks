@@ -12,6 +12,8 @@ License URI: http://opensource.org/licenses/MIT
 
 class WPUCacheBlocks {
     private $blocks = array();
+    private $cached_blocks = array();
+    private $reload_hooks = array();
     private $cache_dir = array();
 
     public function __construct() {
@@ -21,6 +23,9 @@ class WPUCacheBlocks {
     public function wp_loaded() {
         $this->check_cache_dir();
         $this->blocks = $this->load_blocks_list();
+        foreach ($this->reload_hooks as $hook) {
+            add_action($hook, array(&$this, 'reload_hooks'));
+        }
     }
 
     /**
@@ -37,6 +42,16 @@ class WPUCacheBlocks {
         }
     }
 
+    public function reload_hooks() {
+        $current_filter = current_filter();
+        foreach ($this->blocks as $id => $block) {
+            /* If block should be reloaded at current filter */
+            if (in_array($current_filter, $block['reload_hooks'])) {
+                $this->get_block_content($id, true);
+            }
+        }
+    }
+
     /**
      * Load block lists from a WordPress hook.
      * @return array  blocks list.
@@ -50,11 +65,29 @@ class WPUCacheBlocks {
                 /* A path should always be defined */
                 continue;
             }
+            /* Full path to the file */
             if (!isset($block['fullpath'])) {
                 $block['fullpath'] = get_stylesheet_directory() . $block['path'];
             }
+
+            /* Reload hooks */
+            if (!isset($block['reload_hooks']) || !is_array($block['reload_hooks'])) {
+                $block['reload_hooks'] = array();
+            } else {
+                /* Keep a list of all hooks used */
+                foreach ($block['reload_hooks'] as $hook) {
+                    $this->reload_hooks[$hook] = $hook;
+                }
+            }
+
+            /* Expiration time */
             if (!isset($block['expires'])) {
                 $block['expires'] = 3600;
+            } else {
+                /* Allow infinite lifespan for a cached block ( no front reload ) */
+                if ($block['expires'] == 0) {
+                    $block['expires'] = false;
+                }
             }
             $blocks[$id] = $block;
         }
@@ -88,7 +121,7 @@ class WPUCacheBlocks {
         }
 
         /* Cache is expired */
-        if (filemtime($cache_file) + $this->blocks[$id]['expires'] < time()) {
+        if ($this->blocks[$id]['expires'] !== false && filemtime($cache_file) + $this->blocks[$id]['expires'] < time()) {
             return false;
         }
 
@@ -107,8 +140,14 @@ class WPUCacheBlocks {
     public function get_block_content($id, $reload = false) {
 
         if (!$reload) {
+
+            if (isset($this->cached_blocks[$id])) {
+                return $this->cached_blocks[$id];
+            }
+
             $content = $this->get_cache_content($id);
             if ($content !== false) {
+                $this->cached_blocks[$id] = $content;
                 return $content;
             }
         }
@@ -120,6 +159,7 @@ class WPUCacheBlocks {
 
         // Save cache
         $this->save_block_in_cache($id, $content);
+        $this->cached_blocks[$id] = $content;
 
         return $content;
 
