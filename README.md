@@ -14,6 +14,20 @@ function demo_wpucacheblocks_blocks($blocks) {
 }
 ```
 
+### Global settings :
+
+#### filter : wpucacheblocks_cacheprefix (string: default wpucacheblocks_)
+
+String used to prefix cache keys & cache filenames (only [a-z0-9_] chars). Default : *wpucacheblocks_*.
+
+#### filter : wpucacheblocks_cachetype (string: default file)
+
+Cache method. You can choose between 'file' and 'apc'
+
+#### filter : wpucacheblocks_cachedir (string: default wp-content/uploads/wpucacheblocks/)
+
+Absolute path to the file cache dir.
+
 ### Settings per block :
 
 #### path (string)

@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 0.1
+Version: 0.3
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -14,14 +14,18 @@ class WPUCacheBlocks {
     private $blocks = array();
     private $cached_blocks = array();
     private $reload_hooks = array();
-    private $cache_dir = array();
+    private $cache_dir = '';
+    private $cache_file = '';
+    private $cache_type = 'file';
+    private $cache_prefix = 'wpucacheblocks_';
+    private $cache_types = array('file', 'apc');
 
     public function __construct() {
         add_action('wp_loaded', array(&$this, 'wp_loaded'));
     }
 
     public function wp_loaded() {
-        $this->check_cache_dir();
+        $this->check_cache_conf();
         $this->blocks = $this->load_blocks_list();
         foreach ($this->reload_hooks as $hook) {
             add_action($hook, array(&$this, 'reload_hooks'));
@@ -29,16 +33,35 @@ class WPUCacheBlocks {
     }
 
     /**
-     * Check if cache dir exists
+     * Check cache config
      * @return void
      */
-    public function check_cache_dir() {
-        $upload_dir = wp_upload_dir();
-        $this->cache_dir = apply_filters('wpucacheblocks_cachedir', $upload_dir['basedir'] . '/wpucacheblocks/');
-        if (!is_dir($this->cache_dir)) {
-            @mkdir($this->cache_dir, 0755);
-            @chmod($this->cache_dir, 0755);
-            @file_put_contents($this->cache_dir . '.htaccess', 'deny from all');
+    public function check_cache_conf() {
+
+        $this->cache_prefix = strtolower(apply_filters('wpucacheblocks_cacheprefix', $this->cache_prefix) . get_locale() . '_');
+        $this->cache_prefix = preg_replace("/[^a-z0-9_]/", '', $this->cache_prefix);
+
+        /* Config cache type */
+        $this->cache_type = apply_filters('wpucacheblocks_cachetype', $this->cache_type);
+        if (!in_array($this->cache_type, $this->cache_types)) {
+            $this->cache_type = $this->cache_types[0];
+        }
+
+        /* If APC, check if enabled */
+        if ($this->cache_type == 'apc' && (!extension_loaded('apc') || !ini_get('apc.enabled'))) {
+            $this->cache_type = $this->cache_types[0];
+        }
+
+        /* Check if cache dir exists */
+        if ($this->cache_type == 'file') {
+            $upload_dir = wp_upload_dir();
+            $this->cache_dir = apply_filters('wpucacheblocks_cachedir', $upload_dir['basedir'] . '/wpucacheblocks/');
+            $this->cache_file = $this->cache_dir . $this->cache_prefix . '#id#.txt';
+            if (!is_dir($this->cache_dir)) {
+                @mkdir($this->cache_dir, 0755);
+                @chmod($this->cache_dir, 0755);
+                @file_put_contents($this->cache_dir . '.htaccess', 'deny from all');
+            }
         }
     }
 
@@ -99,12 +122,20 @@ class WPUCacheBlocks {
      * @param string $id      ID of the block.
      * @param string $content Content that will be cached.
      */
-    public function save_block_in_cache($id = '', $content = '') {
-        $cache_file = $this->cache_dir . 'cache-' . $id . '.txt';
-        if (file_exists($cache_file)) {
-            unlink($cache_file);
+    public function save_block_in_cache($id = '', $content = '', $expires = false) {
+
+        switch ($this->cache_type) {
+        case 'apc':
+            apc_store($this->cache_prefix . $id, $content, $expires);
+            break;
+        default:
+            $cache_file = str_replace('#id#', $id, $this->cache_file);
+            if (file_exists($cache_file)) {
+                unlink($cache_file);
+            }
+            file_put_contents($cache_file, $content);
         }
-        file_put_contents($cache_file, $content);
+
     }
 
     /**
@@ -113,22 +144,28 @@ class WPUCacheBlocks {
      * @return mixed        false|string : false if invalid cache, string of cached content if valid.
      */
     public function get_cache_content($id = '') {
-        $cache_file = $this->cache_dir . 'cache-' . $id . '.txt';
 
-        /* Cache does not exists */
-        if (!file_exists($cache_file)) {
-            return false;
+        switch ($this->cache_type) {
+        case 'apc':
+            return apc_fetch($this->cache_prefix . $id);
+            break;
+        default:
+            $cache_file = str_replace('#id#', $id, $this->cache_file);
+
+            /* Cache does not exists */
+            if (!file_exists($cache_file)) {
+                return false;
+            }
+
+            /* Cache is expired */
+            if ($this->blocks[$id]['expires'] !== false && filemtime($cache_file) + $this->blocks[$id]['expires'] < time()) {
+                return false;
+            }
+
+            /* Return cache content */
+            return file_get_contents($cache_file);
         }
 
-        /* Cache is expired */
-        if ($this->blocks[$id]['expires'] !== false && filemtime($cache_file) + $this->blocks[$id]['expires'] < time()) {
-            return false;
-        }
-
-        /* Return cache content */
-        ob_start();
-        include $cache_file;
-        return ob_get_clean();
     }
 
     /**
@@ -141,10 +178,12 @@ class WPUCacheBlocks {
 
         if (!$reload) {
 
+            // Cache has already been called on this page
             if (isset($this->cached_blocks[$id])) {
                 return $this->cached_blocks[$id];
             }
 
+            // Get cached version if exists
             $content = $this->get_cache_content($id);
             if ($content !== false) {
                 $this->cached_blocks[$id] = $content;
@@ -152,13 +191,15 @@ class WPUCacheBlocks {
             }
         }
 
-        // Get block content
+        // Get original block content
         ob_start();
         include $this->blocks[$id]['fullpath'];
         $content = ob_get_clean();
 
         // Save cache
-        $this->save_block_in_cache($id, $content);
+        $this->save_block_in_cache($id, $content, $this->blocks[$id]['expires']);
+
+        // Keep cache content if needs to be reused
         $this->cached_blocks[$id] = $content;
 
         return $content;
