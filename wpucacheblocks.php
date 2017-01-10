@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 0.3
+Version: 0.4
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -18,6 +18,7 @@ class WPUCacheBlocks {
     private $cache_file = '';
     private $cache_type = 'file';
     private $cache_prefix = 'wpucacheblocks_';
+    private $base_cache_prefix = 'wpucacheblocks_';
     private $cache_types = array('file', 'apc');
 
     public function __construct() {
@@ -38,7 +39,9 @@ class WPUCacheBlocks {
      */
     public function check_cache_conf() {
 
-        $this->cache_prefix = strtolower(apply_filters('wpucacheblocks_cacheprefix', $this->cache_prefix) . get_locale() . '_');
+        $this->cache_prefix = strtolower(apply_filters('wpucacheblocks_cacheprefix', $this->cache_prefix));
+        $this->base_cache_prefix = $this->cache_prefix;
+        $this->cache_prefix = $this->cache_prefix . strtolower(get_locale()) . '_';
         $this->cache_prefix = preg_replace("/[^a-z0-9_]/", '', $this->cache_prefix);
 
         /* Config cache type */
@@ -71,6 +74,36 @@ class WPUCacheBlocks {
             /* If block should be reloaded at current filter */
             if (in_array($current_filter, $block['reload_hooks'])) {
                 $this->get_block_content($id, true);
+            }
+        }
+    }
+
+    public function clear_cache() {
+        switch ($this->cache_type) {
+        case 'apc':
+            /* Get list of cached blocks */
+            $cache_info = apc_cache_info();
+            if (!is_array($cache_info) || !isset($cache_info['cache_list'])) {
+                return;
+            }
+            $prefix_len = strlen($this->base_cache_prefix);
+            foreach ($cache_info['cache_list'] as $item) {
+                /* Delete block cache */
+                if (substr($item['info'], 0, $prefix_len) == $this->base_cache_prefix) {
+                    apc_delete($item['info']);
+                }
+            }
+            break;
+        default:
+            /* Get list of all files in cache */
+            $excluded_files = array('.', '..', '.htaccess');
+            $cache_files = scandir($this->cache_dir);
+            foreach ($cache_files as $cache_file) {
+                if (in_array($cache_file, $excluded_files)) {
+                    continue;
+                }
+                /* Delete cache file */
+                unlink($this->cache_dir . $cache_file);
             }
         }
     }
