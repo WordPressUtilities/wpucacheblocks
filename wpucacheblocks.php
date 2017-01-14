@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 0.5
+Version: 0.5.1
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -39,17 +39,34 @@ class WPUCacheBlocks {
         include 'inc/WPUBaseMessages/WPUBaseMessages.php';
         $this->messages = new \wpucacheblocks\WPUBaseMessages($this->options['plugin_id']);
 
-        // Admin page
-        $this->options['admin_url'] = admin_url('options-general.php?page=' . $this->options['plugin_id']);
-        add_action('admin_menu', array(&$this,
-            'admin_menu'
-        ));
-        add_filter("plugin_action_links_" . plugin_basename(__FILE__), array(&$this,
-            'add_settings_link'
-        ));
-        add_action('admin_post_wpucacheblock_postaction', array(&$this,
-            'postAction'
-        ));
+
+        include 'inc/WPUBaseAdminPage/WPUBaseAdminPage.php';
+        $admin_pages = array(
+            'main' => array(
+                'menu_name' => 'Cache Blocks',
+                'name' => 'WPU Cache Blocks',
+                'icon_url' => 'dashicons-lightbulb',
+                'settings_link' => true,
+                'settings_name' => 'Settings',
+                'function_content' => array(&$this,
+                    'page_content__main'
+                ),
+                'function_action' => array(&$this,
+                    'page_action__main'
+                )
+            )
+        );
+
+        $pages_options = array(
+            'id' => 'wpucacheblocks',
+            'level' => 'manage_options',
+            'basename' => plugin_basename(__FILE__)
+        );
+
+        // Init admin page
+        $this->adminpages = new \wpucacheblocks\WPUBaseAdminPage();
+        $this->adminpages->init($pages_options, $admin_pages);
+
 
     }
 
@@ -271,21 +288,8 @@ class WPUCacheBlocks {
       Admin page
     ---------------------------------------------------------- */
 
-    public function admin_menu() {
-        add_submenu_page('options-general.php', $this->options['plugin_name'] . ' - ' . __('Settings'), $this->options['plugin_name'], $this->options['plugin_userlevel'], $this->options['plugin_pageslug'], array(&$this,
-            'admin_settings'
-        ), '', 110);
-    }
 
-    public function add_settings_link($links) {
-        $settings_link = '<a href="' . $this->options['admin_url'] . '">' . __('Settings') . '</a>';
-        array_unshift($links, $settings_link);
-        return $links;
-    }
-
-    public function admin_settings() {
-        echo '<div class="wrap">';
-        echo '<h2>' . $this->options['plugin_name'] . '</h2>';
+    public function page_content__main() {
 
         /* Blocks */
         echo '<h3>Blocks</h3>';
@@ -300,18 +304,13 @@ class WPUCacheBlocks {
         /* Actions */
         echo '<hr />';
         echo '<h3>Actions</h3>';
-        echo '<form action="' . admin_url('admin-post.php') . '" method="post">';
-        echo '<input type="hidden" name="action" value="wpucacheblock_postaction">';
         submit_button(__('Clear cache', 'wpucacheblocks'), 'primary', 'clear_cache', false);
         echo ' ';
         submit_button(__('Rebuild cache', 'wpucacheblocks'), 'primary', 'rebuild_cache', false);
-        echo '</form>';
-
-        echo '</div>';
 
     }
 
-    public function postAction() {
+    public function page_action__main() {
         if (isset($_POST['clear_cache'])) {
             $this->clear_cache();
             $this->messages->set_message('cleared_cache', __('Cache has been cleared', 'wpucacheblocks'));
@@ -322,10 +321,7 @@ class WPUCacheBlocks {
             }
             $this->messages->set_message('rebuilt_cache', __('Cache has been rebuilt', 'wpucacheblocks'));
         }
-        wp_safe_redirect(wp_get_referer());
-        die();
     }
-
 }
 
 $WPUCacheBlocks = new WPUCacheBlocks();
