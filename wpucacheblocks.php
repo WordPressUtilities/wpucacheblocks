@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 0.5.1
+Version: 0.6
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -20,53 +20,56 @@ class WPUCacheBlocks {
     private $cache_prefix = 'wpucacheblocks_';
     private $base_cache_prefix = 'wpucacheblocks_';
     private $cache_types = array('file', 'apc');
-    private $options = array(
-        'id' => 'wpucacheblocks',
-        'plugin_name' => 'WPU Cache Blocks',
-        'plugin_pageslug' => 'wpucacheblocks',
-        'plugin_userlevel' => 'manage_options',
-        'plugin_id' => 'wpucacheblocks'
-    );
+    private $options = array();
 
     public function __construct() {
         add_action('plugins_loaded', array(&$this, 'plugins_loaded'));
         add_action('wp_loaded', array(&$this, 'wp_loaded'));
+        $this->options = array(
+            'basename' => plugin_basename(__FILE__),
+            'id' => 'wpucacheblocks',
+            'level' => 'manage_options'
+        );
     }
 
     public function plugins_loaded() {
 
         // Messages
         include 'inc/WPUBaseMessages/WPUBaseMessages.php';
-        $this->messages = new \wpucacheblocks\WPUBaseMessages($this->options['plugin_id']);
-
+        $this->messages = new \wpucacheblocks\WPUBaseMessages($this->options['id']);
 
         include 'inc/WPUBaseAdminPage/WPUBaseAdminPage.php';
         $admin_pages = array(
             'main' => array(
                 'menu_name' => 'Cache Blocks',
-                'name' => 'WPU Cache Blocks',
-                'icon_url' => 'dashicons-lightbulb',
-                'settings_link' => true,
-                'settings_name' => 'Settings',
+                'page_title' => 'WPU Cache Blocks - Block list',
+                'name' => 'Block list',
                 'function_content' => array(&$this,
                     'page_content__main'
                 ),
                 'function_action' => array(&$this,
                     'page_action__main'
                 )
+            ),
+            'actions' => array(
+                'parent' => 'main',
+                'menu_name' => 'Actions',
+                'page_title' => 'WPU Cache Blocks - Actions',
+                'name' => 'Actions',
+                'settings_link' => true,
+                'settings_name' => 'Settings',
+                'function_content' => array(&$this,
+                    'page_content__actions'
+                ),
+                'function_action' => array(&$this,
+                    'page_action__actions'
+                )
             )
-        );
-
-        $pages_options = array(
-            'id' => 'wpucacheblocks',
-            'level' => 'manage_options',
-            'basename' => plugin_basename(__FILE__)
         );
 
         // Init admin page
         $this->adminpages = new \wpucacheblocks\WPUBaseAdminPage();
-        $this->adminpages->init($pages_options, $admin_pages);
-
+        $this->adminpages->init($this->options, $admin_pages);
 
     }
 
@@ -181,6 +184,10 @@ class WPUCacheBlocks {
                 }
             }
 
+            if (!isset($block['minify'])) {
+                $block['minify'] = true;
+            }
+
             /* Expiration time */
             if (!isset($block['expires'])) {
                 $block['expires'] = 3600;
@@ -201,6 +208,13 @@ class WPUCacheBlocks {
      * @param string $content Content that will be cached.
      */
     public function save_block_in_cache($id = '', $content = '', $expires = false) {
+
+        if ($this->blocks[$id]['minify']) {
+            // Remove multiple spaces
+            $content = preg_replace('! {2,}!', ' ', $content);
+            // Trim each line
+            $content = implode("\n", array_map('trim', explode("\n", $content)));
+        }
 
         switch ($this->cache_type) {
         case 'apc':
@@ -244,6 +258,49 @@ class WPUCacheBlocks {
             return file_get_contents($cache_file);
         }
 
+        return false;
+
+    }
+
+    /**
+     * Get cache expiration date
+     * @param  string $id   ID of the block.
+     * @return mixed        false|int : false if invalid cache, int: expiration date if valid.
+     */
+    public function get_cache_expiration($id = '') {
+
+        if ($this->blocks[$id]['expires'] === false) {
+            return false;
+        }
+
+        switch ($this->cache_type) {
+        case 'apc':
+
+            $cache_info = apc_cache_info();
+            if (!is_array($cache_info) || !isset($cache_info['cache_list'])) {
+                return;
+            }
+
+            foreach ($cache_info['cache_list'] as $cache_item) {
+                if ($cache_item['info'] == $this->cache_prefix . $id) {
+                    return $this->blocks[$id]['expires'] - time() + $cache_item['mtime'];
+                }
+            }
+
+            break;
+        default:
+            $cache_file = str_replace('#id#', $id, $this->cache_file);
+
+            /* Cache does not exists */
+            if (!file_exists($cache_file)) {
+                return false;
+            }
+
+            return $this->blocks[$id]['expires'] - time() + filemtime($cache_file);
+
+        }
+
+        return false;
     }
 
     /**
@@ -288,38 +345,63 @@ class WPUCacheBlocks {
       Admin page
     ---------------------------------------------------------- */
 
+    /* Main
+    -------------------------- */
 
     public function page_content__main() {
 
-        /* Blocks */
         echo '<h3>Blocks</h3>';
         foreach ($this->blocks as $id => $block) {
             echo '<p>';
             echo '<strong>' . $id . ' - ' . $block['path'] . '</strong><br />';
             $_expiration = (is_bool($block['expires']) ? __('never', 'wpucacheblocks') : $block['expires'] . 's');
             echo sprintf(__('Expiration: %s', 'wpucacheblocks'), $_expiration);
+            $cache_status = $this->get_cache_content($id);
+            if ($cache_status !== false) {
+                echo '<br />' . __('Block is cached.', 'wpucacheblocks');
+                $cache_expiration = $this->get_cache_expiration($id);
+                if ($cache_expiration !== false) {
+                    echo '<br />' . sprintf(__('Cache expires in %ss.', 'wpucacheblocks'), $cache_expiration);
+                }
+            } else {
+                echo '<br />' . __('Block is not cached.', 'wpucacheblocks');
+            }
+            echo '<br /><br />';
+            submit_button(__('Reload', 'wpucacheblocks'), 'secondary', 'reload__' . $id, false);
             echo '</p>';
+            echo '<hr />';
         }
+    }
 
-        /* Actions */
-        echo '<hr />';
-        echo '<h3>Actions</h3>';
+    public function page_action__main() {
+        foreach ($this->blocks as $id => $block) {
+            if (isset($_POST['reload__' . $id])) {
+                $this->get_block_content($id, true);
+                $this->messages->set_message('rebuilt_cache__' . $id, sprintf(__('Cache for the block "%s" has been rebuilt.', 'wpucacheblocks'), $id));
+            }
+        }
+    }
+
+    /* Actions
+    -------------------------- */
+
+    public function page_content__actions() {
         submit_button(__('Clear cache', 'wpucacheblocks'), 'primary', 'clear_cache', false);
         echo ' ';
         submit_button(__('Rebuild cache', 'wpucacheblocks'), 'primary', 'rebuild_cache', false);
 
     }
 
-    public function page_action__main() {
+    public function page_action__actions() {
         if (isset($_POST['clear_cache'])) {
             $this->clear_cache();
-            $this->messages->set_message('cleared_cache', __('Cache has been cleared', 'wpucacheblocks'));
+            $this->messages->set_message('cleared_cache', __('Cache has been cleared.', 'wpucacheblocks'));
         }
         if (isset($_POST['rebuild_cache'])) {
             foreach ($this->blocks as $id => $block) {
                 $this->get_block_content($id, true);
             }
-            $this->messages->set_message('rebuilt_cache', __('Cache has been rebuilt', 'wpucacheblocks'));
+            $this->messages->set_message('rebuilt_cache', __('Cache has been rebuilt.', 'wpucacheblocks'));
         }
     }
 }
