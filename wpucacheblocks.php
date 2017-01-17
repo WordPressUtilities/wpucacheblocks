@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 0.6
+Version: 0.7
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -11,6 +11,7 @@ License URI: http://opensource.org/licenses/MIT
 */
 
 class WPUCacheBlocks {
+    private $version = '0.7';
     private $blocks = array();
     private $cached_blocks = array();
     private $reload_hooks = array();
@@ -21,6 +22,7 @@ class WPUCacheBlocks {
     private $base_cache_prefix = 'wpucacheblocks_';
     private $cache_types = array('file', 'apc');
     private $options = array();
+    private $translations = array();
 
     public function __construct() {
         add_action('plugins_loaded', array(&$this, 'plugins_loaded'));
@@ -28,11 +30,13 @@ class WPUCacheBlocks {
         $this->options = array(
             'basename' => plugin_basename(__FILE__),
             'id' => 'wpucacheblocks',
+            'name' => 'WPU Cache Blocks',
             'level' => 'manage_options'
         );
     }
 
     public function plugins_loaded() {
+        load_plugin_textdomain('wpucacheblocks', false, dirname(plugin_basename(__FILE__)) . '/lang/');
 
         // Messages
         include 'inc/WPUBaseMessages/WPUBaseMessages.php';
@@ -41,21 +45,24 @@ class WPUCacheBlocks {
         include 'inc/WPUBaseAdminPage/WPUBaseAdminPage.php';
         $admin_pages = array(
             'main' => array(
-                'menu_name' => 'Cache Blocks',
-                'page_title' => 'WPU Cache Blocks - Block list',
-                'name' => 'Block list',
+                'name' => __('Cache blocks', 'wpucacheblocks'),
+                'page_title' => sprintf(__('%s - Block list', 'wpucacheblocks'), $this->options['name']),
+                'name' => __('Block list', 'wpucacheblocks'),
                 'function_content' => array(&$this,
                     'page_content__main'
                 ),
                 'function_action' => array(&$this,
                     'page_action__main'
+                ),
+                'actions' => array(
+                    array('admin_enqueue_scripts', array(&$this, 'admin_enqueue_scripts'))
                 )
             ),
             'actions' => array(
                 'parent' => 'main',
-                'menu_name' => 'Actions',
-                'page_title' => 'WPU Cache Blocks - Actions',
-                'name' => 'Actions',
+                'name' => __('Actions', 'wpucacheblocks'),
+                'page_title' => sprintf(__('%s - Actions', 'wpucacheblocks'), $this->options['name']),
+                'name' => __('Actions', 'wpucacheblocks'),
                 'settings_link' => true,
                 'settings_name' => 'Settings',
                 'function_content' => array(&$this,
@@ -74,6 +81,8 @@ class WPUCacheBlocks {
     }
 
     public function wp_loaded() {
+        $this->translations = get_available_languages();
+        $this->translations[] = 'en_US';
         $this->check_cache_conf();
         $this->blocks = $this->load_blocks_list();
         foreach ($this->reload_hooks as $hook) {
@@ -89,7 +98,7 @@ class WPUCacheBlocks {
 
         $this->cache_prefix = strtolower(apply_filters('wpucacheblocks_cacheprefix', $this->cache_prefix));
         $this->base_cache_prefix = $this->cache_prefix;
-        $this->cache_prefix = $this->cache_prefix . strtolower(get_locale()) . '_';
+        // $this->cache_prefix = strtolower(get_locale()) . '_' . $this->cache_prefix;
         $this->cache_prefix = preg_replace("/[^a-z0-9_]/", '', $this->cache_prefix);
 
         /* Config cache type */
@@ -121,7 +130,7 @@ class WPUCacheBlocks {
         foreach ($this->blocks as $id => $block) {
             /* If block should be reloaded at current filter */
             if (in_array($current_filter, $block['reload_hooks'])) {
-                $this->get_block_content($id, true);
+                $this->save_block_in_cache($id);
             }
         }
     }
@@ -205,10 +214,18 @@ class WPUCacheBlocks {
     /**
      * Save block in cache
      * @param string $id      ID of the block.
-     * @param string $content Content that will be cached.
      */
-    public function save_block_in_cache($id = '', $content = '', $expires = false) {
+    public function save_block_in_cache($id = '') {
 
+        $expires = $this->blocks[$id]['expires'];
+
+        // Get original block content
+        ob_start();
+        include $this->blocks[$id]['fullpath'];
+        $content = ob_get_clean();
+
+        // Keep cache content if needs to be reused
+        $this->cached_blocks[$id] = $content;
         if ($this->blocks[$id]['minify']) {
             // Remove multiple spaces
             $content = preg_replace('! {2,}!', ' ', $content);
@@ -228,6 +245,7 @@ class WPUCacheBlocks {
             file_put_contents($cache_file, $content);
         }
 
+        return $content;
     }
 
     /**
@@ -259,7 +277,6 @@ class WPUCacheBlocks {
         }
 
         return false;
-
     }
 
     /**
@@ -326,19 +343,10 @@ class WPUCacheBlocks {
             }
         }
 
-        // Get original block content
-        ob_start();
-        include $this->blocks[$id]['fullpath'];
-        $content = ob_get_clean();
-
         // Save cache
-        $this->save_block_in_cache($id, $content, $this->blocks[$id]['expires']);
-
-        // Keep cache content if needs to be reused
-        $this->cached_blocks[$id] = $content;
+        $content = $this->save_block_in_cache($id);
 
         return $content;
-
     }
 
     /* ----------------------------------------------------------
@@ -361,7 +369,7 @@ class WPUCacheBlocks {
                 echo '<br />' . __('Block is cached.', 'wpucacheblocks');
                 $cache_expiration = $this->get_cache_expiration($id);
                 if ($cache_expiration !== false) {
-                    echo '<br />' . sprintf(__('Cache expires in %ss.', 'wpucacheblocks'), $cache_expiration);
+                    echo '<span style="display:block;" data-wpucacheblockscounterempty="' . __('Cache has expired', 'wpucacheblocks') . '">' . sprintf(__('Cache expires in %ss.', 'wpucacheblocks'), '<span data-wpucacheblockscounter="' . $cache_expiration . '">' . $cache_expiration . '</span>') . '</span>';
                 }
             } else {
                 echo '<br />' . __('Block is not cached.', 'wpucacheblocks');
@@ -376,10 +384,16 @@ class WPUCacheBlocks {
     public function page_action__main() {
         foreach ($this->blocks as $id => $block) {
             if (isset($_POST['reload__' . $id])) {
-                $this->get_block_content($id, true);
+                $this->save_block_in_cache($id);
                 $this->messages->set_message('rebuilt_cache__' . $id, sprintf(__('Cache for the block "%s" has been rebuilt.', 'wpucacheblocks'), $id));
             }
         }
+    }
+
+    public function admin_enqueue_scripts() {
+        wp_enqueue_script('wpucacheblocks-main', plugins_url('/assets/main.js', __FILE__), array(
+            'jquery'
+        ), $this->version, true);
     }
 
     /* Actions
@@ -389,7 +403,6 @@ class WPUCacheBlocks {
         submit_button(__('Clear cache', 'wpucacheblocks'), 'primary', 'clear_cache', false);
         echo ' ';
         submit_button(__('Rebuild cache', 'wpucacheblocks'), 'primary', 'rebuild_cache', false);
-
     }
 
     public function page_action__actions() {
@@ -399,14 +412,36 @@ class WPUCacheBlocks {
         }
         if (isset($_POST['rebuild_cache'])) {
             foreach ($this->blocks as $id => $block) {
-                $this->get_block_content($id, true);
+                $this->save_block_in_cache($id);
             }
             $this->messages->set_message('rebuilt_cache', __('Cache has been rebuilt.', 'wpucacheblocks'));
         }
     }
+
+    /* ----------------------------------------------------------
+      Activation / Deactivation
+    ---------------------------------------------------------- */
+
+    public function activate() {
+
+    }
+
+    public function deactivate() {
+        $this->wp_loaded();
+        $this->clear_cache();
+    }
+
 }
 
 $WPUCacheBlocks = new WPUCacheBlocks();
+
+/* Set activation/deactivation hook */
+register_activation_hook(__FILE__, array(&$WPUCacheBlocks,
+    'activate'
+));
+register_deactivation_hook(__FILE__, array(&$WPUCacheBlocks,
+    'deactivate'
+));
 
 /**
  * Helper function to get the content of a block
