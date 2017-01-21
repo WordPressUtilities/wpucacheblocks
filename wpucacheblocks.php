@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 0.7
+Version: 0.7.1
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -11,7 +11,7 @@ License URI: http://opensource.org/licenses/MIT
 */
 
 class WPUCacheBlocks {
-    private $version = '0.7';
+    private $version = '0.7.1';
     private $blocks = array();
     private $cached_blocks = array();
     private $reload_hooks = array();
@@ -22,11 +22,14 @@ class WPUCacheBlocks {
     private $base_cache_prefix = 'wpucacheblocks_';
     private $cache_types = array('file', 'apc');
     private $options = array();
-    private $translations = array();
+    private $languages = array();
+    private $current_block = false;
+    private $current_lang = false;
 
     public function __construct() {
         add_action('plugins_loaded', array(&$this, 'plugins_loaded'));
-        add_action('wp_loaded', array(&$this, 'wp_loaded'));
+        add_action('plugins_loaded', array(&$this, 'set_reload_front'));
+        add_action('template_include', array(&$this, 'generate_reload_front'));
         $this->options = array(
             'basename' => plugin_basename(__FILE__),
             'id' => 'wpucacheblocks',
@@ -78,11 +81,9 @@ class WPUCacheBlocks {
         $this->adminpages = new \wpucacheblocks\WPUBaseAdminPage();
         $this->adminpages->init($this->options, $admin_pages);
 
-    }
-
-    public function wp_loaded() {
-        $this->translations = get_available_languages();
-        $this->translations[] = 'en_US';
+        // Settings
+        $this->languages = get_available_languages();
+        $this->languages[] = 'en_US';
         $this->check_cache_conf();
         $this->blocks = $this->load_blocks_list();
         foreach ($this->reload_hooks as $hook) {
@@ -347,6 +348,42 @@ class WPUCacheBlocks {
         $content = $this->save_block_in_cache($id);
 
         return $content;
+    }
+
+    /* ----------------------------------------------------------
+      Reload front
+    ---------------------------------------------------------- */
+
+    public function set_reload_front() {
+        if (!isset($_GET['wpucache_block']) || !array_key_exists($_GET['wpucache_block'], $this->blocks)) {
+            return false;
+        }
+        $this->current_block = $_GET['wpucache_block'];
+        if (!isset($_GET['block_lang']) || !in_array($_GET['block_lang'], $this->languages)) {
+            return false;
+        }
+        $this->current_lang = $_GET['block_lang'];
+        add_filter('locale', array(&$this, 'set_current_lang'));
+        if(!defined('WPLANG')){
+            define('WPLANG', $this->current_lang);
+        }
+    }
+
+    public function set_current_lang($locale) {
+        if ($this->current_lang !== false) {
+            $locale = $this->current_lang;
+        }
+        return $locale;
+    }
+
+    public function generate_reload_front($tpl) {
+        if ($this->current_block === false) {
+            return $tpl;
+        }
+
+        echo $this->get_block_content($this->current_block, true);
+
+        die;
     }
 
     /* ----------------------------------------------------------
