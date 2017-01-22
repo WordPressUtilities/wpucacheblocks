@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 0.7.1
+Version: 0.7.2
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -11,7 +11,7 @@ License URI: http://opensource.org/licenses/MIT
 */
 
 class WPUCacheBlocks {
-    private $version = '0.7.1';
+    private $version = '0.7.2';
     private $blocks = array();
     private $cached_blocks = array();
     private $reload_hooks = array();
@@ -48,7 +48,7 @@ class WPUCacheBlocks {
         include 'inc/WPUBaseAdminPage/WPUBaseAdminPage.php';
         $admin_pages = array(
             'main' => array(
-                'name' => __('Cache blocks', 'wpucacheblocks'),
+                'menu_name' => __('Cache blocks', 'wpucacheblocks'),
                 'page_title' => sprintf(__('%s - Block list', 'wpucacheblocks'), $this->options['name']),
                 'name' => __('Block list', 'wpucacheblocks'),
                 'function_content' => array(&$this,
@@ -65,7 +65,6 @@ class WPUCacheBlocks {
                 'parent' => 'main',
                 'name' => __('Actions', 'wpucacheblocks'),
                 'page_title' => sprintf(__('%s - Actions', 'wpucacheblocks'), $this->options['name']),
-                'name' => __('Actions', 'wpucacheblocks'),
                 'settings_link' => true,
                 'settings_name' => 'Settings',
                 'function_content' => array(&$this,
@@ -214,9 +213,15 @@ class WPUCacheBlocks {
 
     /**
      * Save block in cache
-     * @param string $id      ID of the block.
+     * @param string $id     ID of the block.
+     * @param mixed  $lang   false|string : Current language.
      */
-    public function save_block_in_cache($id = '') {
+    public function save_block_in_cache($id = '', $lang = false) {
+
+        $prefix = '';
+        if ($lang !== false) {
+            $prefix = $lang . '__';
+        }
 
         $expires = $this->blocks[$id]['expires'];
 
@@ -236,10 +241,10 @@ class WPUCacheBlocks {
 
         switch ($this->cache_type) {
         case 'apc':
-            apc_store($this->cache_prefix . $id, $content, $expires);
+            apc_store($this->cache_prefix . $prefix . $id, $content, $expires);
             break;
         default:
-            $cache_file = str_replace('#id#', $id, $this->cache_file);
+            $cache_file = str_replace('#id#', $prefix . $id, $this->cache_file);
             if (file_exists($cache_file)) {
                 unlink($cache_file);
             }
@@ -251,17 +256,23 @@ class WPUCacheBlocks {
 
     /**
      * Get cached block content if available
-     * @param  string $id   ID of the block.
-     * @return mixed        false|string : false if invalid cache, string of cached content if valid.
+     * @param  string $id    ID of the block.
+     * @param  mixed  $lang  false|string : Current language.
+     * @return mixed         false|string : false if invalid cache, string of cached content if valid.
      */
-    public function get_cache_content($id = '') {
+    public function get_cache_content($id = '', $lang = false) {
+
+        $prefix = '';
+        if ($lang !== false) {
+            $prefix = $lang . '__';
+        }
 
         switch ($this->cache_type) {
         case 'apc':
-            return apc_fetch($this->cache_prefix . $id);
+            return apc_fetch($this->cache_prefix . $prefix . $id);
             break;
         default:
-            $cache_file = str_replace('#id#', $id, $this->cache_file);
+            $cache_file = str_replace('#id#', $prefix . $id, $this->cache_file);
 
             /* Cache does not exists */
             if (!file_exists($cache_file)) {
@@ -355,6 +366,9 @@ class WPUCacheBlocks {
     ---------------------------------------------------------- */
 
     public function set_reload_front() {
+        if (!is_user_logged_in() || !current_user_can($this->options['level'])) {
+            return false;
+        }
         if (!isset($_GET['wpucache_block']) || !array_key_exists($_GET['wpucache_block'], $this->blocks)) {
             return false;
         }
@@ -364,7 +378,7 @@ class WPUCacheBlocks {
         }
         $this->current_lang = $_GET['block_lang'];
         add_filter('locale', array(&$this, 'set_current_lang'));
-        if(!defined('WPLANG')){
+        if (!defined('WPLANG')) {
             define('WPLANG', $this->current_lang);
         }
     }
@@ -381,7 +395,7 @@ class WPUCacheBlocks {
             return $tpl;
         }
 
-        echo $this->get_block_content($this->current_block, true);
+        echo $this->save_block_in_cache($this->current_block, $this->current_lang);
 
         die;
     }
