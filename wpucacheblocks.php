@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 0.7.2
+Version: 0.7.3
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -11,7 +11,7 @@ License URI: http://opensource.org/licenses/MIT
 */
 
 class WPUCacheBlocks {
-    private $version = '0.7.2';
+    private $version = '0.7.3';
     private $blocks = array();
     private $cached_blocks = array();
     private $reload_hooks = array();
@@ -30,16 +30,18 @@ class WPUCacheBlocks {
         add_action('plugins_loaded', array(&$this, 'plugins_loaded'));
         add_action('plugins_loaded', array(&$this, 'set_reload_front'));
         add_action('template_include', array(&$this, 'generate_reload_front'));
+    }
+
+    public function plugins_loaded() {
+        load_plugin_textdomain('wpucacheblocks', false, dirname(plugin_basename(__FILE__)) . '/lang/');
+
+        // Options
         $this->options = array(
             'basename' => plugin_basename(__FILE__),
             'id' => 'wpucacheblocks',
             'name' => 'WPU Cache Blocks',
             'level' => 'manage_options'
         );
-    }
-
-    public function plugins_loaded() {
-        load_plugin_textdomain('wpucacheblocks', false, dirname(plugin_basename(__FILE__)) . '/lang/');
 
         // Messages
         include 'inc/WPUBaseMessages/WPUBaseMessages.php';
@@ -478,7 +480,6 @@ class WPUCacheBlocks {
     }
 
     public function deactivate() {
-        $this->wp_loaded();
         $this->clear_cache();
     }
 

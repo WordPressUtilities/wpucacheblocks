@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: \n"
-"POT-Creation-Date: 2017-01-17 22:45+0100\n"
+"POT-Creation-Date: 2017-03-13 23:02+0100\n"
 "PO-Revision-Date: \n"
 "Last-Translator: Darklg <darklg.blog@gmail.com>\n"
 "Language-Team: \n"
@@ -19,75 +19,75 @@ msgstr ""
 msgid "Help"
 msgstr "Aide"
 
-#: .././wpucacheblocks.php:48
+#: .././wpucacheblocks.php:53
 msgid "Cache blocks"
 msgstr "Cache blocks"
 
-#: .././wpucacheblocks.php:49
+#: .././wpucacheblocks.php:54
 #, php-format
 msgid "%s - Block list"
 msgstr "%s - Liste des blocs"
 
-#: .././wpucacheblocks.php:50
+#: .././wpucacheblocks.php:55
 msgid "Block list"
 msgstr "Liste des blocs"
 
-#: .././wpucacheblocks.php:63 .././wpucacheblocks.php:65
+#: .././wpucacheblocks.php:68
 msgid "Actions"
 msgstr "Actions"
 
-#: .././wpucacheblocks.php:64
+#: .././wpucacheblocks.php:69
 #, php-format
 msgid "%s - Actions"
 msgstr "%s - Actions"
 
-#: .././wpucacheblocks.php:369
+#: .././wpucacheblocks.php:418
 msgid "never"
 msgstr "jamais"
 
-#: .././wpucacheblocks.php:370
+#: .././wpucacheblocks.php:419
 #, php-format
 msgid "Expiration: %s"
 msgstr "Expiration : %s"
 
-#: .././wpucacheblocks.php:373
+#: .././wpucacheblocks.php:422
 msgid "Block is cached."
 msgstr "Ce bloc est en cache."
 
-#: .././wpucacheblocks.php:376
+#: .././wpucacheblocks.php:425
 msgid "Cache has expired"
 msgstr "Le cache a expiré"
 
-#: .././wpucacheblocks.php:376
+#: .././wpucacheblocks.php:425
 #, php-format
 msgid "Cache expires in %ss."
 msgstr "Le cache expire dans %ss."
 
-#: .././wpucacheblocks.php:379
+#: .././wpucacheblocks.php:428
 msgid "Block is not cached."
 msgstr "Ce bloc n’est pas en cache."
 
-#: .././wpucacheblocks.php:382
+#: .././wpucacheblocks.php:431
 msgid "Reload"
 msgstr "Recharger"
 
-#: .././wpucacheblocks.php:392
+#: .././wpucacheblocks.php:441
 #, php-format
 msgid "Cache for the block \"%s\" has been rebuilt."
 msgstr "Le cache pour le bloc « %s » a été reconstruit."
 
-#: .././wpucacheblocks.php:407
+#: .././wpucacheblocks.php:456
 msgid "Clear cache"
 msgstr "Vider le cache"
 
-#: .././wpucacheblocks.php:409
+#: .././wpucacheblocks.php:458
 msgid "Rebuild cache"
 msgstr "Reconstruire le cache"
 
-#: .././wpucacheblocks.php:415
+#: .././wpucacheblocks.php:464
 msgid "Cache has been cleared."
 msgstr "Le cache a été vidé."
 
-#: .././wpucacheblocks.php:421
+#: .././wpucacheblocks.php:470
 msgid "Cache has been rebuilt."
 msgstr "Le cache a été reconstruit."
