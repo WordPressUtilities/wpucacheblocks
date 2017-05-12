@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 0.7.3
+Version: 0.8.0
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -11,7 +11,7 @@ License URI: http://opensource.org/licenses/MIT
 */
 
 class WPUCacheBlocks {
-    private $version = '0.7.3';
+    private $version = '0.8.0';
     private $blocks = array();
     private $cached_blocks = array();
     private $reload_hooks = array();
@@ -228,9 +228,7 @@ class WPUCacheBlocks {
         $expires = $this->blocks[$id]['expires'];
 
         // Get original block content
-        ob_start();
-        include $this->blocks[$id]['fullpath'];
-        $content = ob_get_clean();
+        $content = wpucacheblocks_load_html_block_content($this->blocks[$id]['fullpath']);
 
         // Keep cache content if needs to be reused
         $this->cached_blocks[$id] = $content;
@@ -341,6 +339,9 @@ class WPUCacheBlocks {
      * @return string           Content of the block.
      */
     public function get_block_content($id, $reload = false) {
+        if (!isset($this->blocks[$id])) {
+            return '';
+        }
 
         if (!$reload) {
 
@@ -494,6 +495,14 @@ register_activation_hook(__FILE__, array(&$WPUCacheBlocks,
 register_deactivation_hook(__FILE__, array(&$WPUCacheBlocks,
     'deactivate'
 ));
+
+
+
+function wpucacheblocks_load_html_block_content($path) {
+    ob_start();
+    include $path;
+    return ob_get_clean();
+}
 
 /**
  * Helper function to get the content of a block

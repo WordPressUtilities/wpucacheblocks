@@ -49,3 +49,21 @@ An array of hooks that will trigger a refresh for the block.
 ```php
 echo wpucacheblocks_block('headersearch');
 ```
+
+## Custom function to allow plugin deactivation :
+
+```php
+function custom_wpucacheblocks_block($blockid) {
+    if (function_exists('wpucacheblocks_block')) {
+        return wpucacheblocks_block($blockid);
+    }
+    $blocks = apply_filters('wpucacheblocks_blocks', array());
+    if (!is_array($blocks) || !isset($blocks[$blockid], $blocks[$blockid]['path'])) {
+        return '';
+    }
+    ob_start();
+    include $blocks[$blockid]['path'];
+    return ob_get_clean();
+}
+echo custom_wpucacheblocks_block('headersearch');
+```
