@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 0.8.0
+Version: 0.8.1
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -11,7 +11,7 @@ License URI: http://opensource.org/licenses/MIT
 */
 
 class WPUCacheBlocks {
-    private $version = '0.8.0';
+    private $version = '0.8.1';
     private $blocks = array();
     private $cached_blocks = array();
     private $reload_hooks = array();
@@ -84,7 +84,9 @@ class WPUCacheBlocks {
 
         // Settings
         $this->languages = get_available_languages();
-        $this->languages[] = 'en_US';
+        if (!in_array('en_US', $this->languages)) {
+            $this->languages[] = 'en_US';
+        }
         $this->check_cache_conf();
         $this->blocks = $this->load_blocks_list();
         foreach ($this->reload_hooks as $hook) {
@@ -98,7 +100,7 @@ class WPUCacheBlocks {
      */
     public function check_cache_conf() {
 
-        $this->cache_prefix = strtolower(apply_filters('wpucacheblocks_cacheprefix', $this->cache_prefix));
+        $this->cache_prefix = 'site' . get_current_blog_id() . '_' . strtolower(apply_filters('wpucacheblocks_cacheprefix', $this->cache_prefix));
         $this->base_cache_prefix = $this->cache_prefix;
         // $this->cache_prefix = strtolower(get_locale()) . '_' . $this->cache_prefix;
         $this->cache_prefix = preg_replace("/[^a-z0-9_]/", '', $this->cache_prefix);
@@ -495,8 +497,6 @@ register_activation_hook(__FILE__, array(&$WPUCacheBlocks,
 register_deactivation_hook(__FILE__, array(&$WPUCacheBlocks,
     'deactivate'
 ));
-
-
 
 function wpucacheblocks_load_html_block_content($path) {
     ob_start();
