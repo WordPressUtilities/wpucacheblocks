@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: \n"
-"POT-Creation-Date: 2017-05-13 23:23+0200\n"
+"POT-Creation-Date: 2017-05-18 23:24+0200\n"
 "PO-Revision-Date: \n"
 "Last-Translator: Darklg <darklg.blog@gmail.com>\n"
 "Language-Team: \n"
@@ -41,53 +41,57 @@ msgstr "Actions"
 msgid "%s - Actions"
 msgstr "%s - Actions"
 
-#: .././wpucacheblocks.php:421
+#: .././wpucacheblocks.php:429
 msgid "never"
 msgstr "jamais"
 
-#: .././wpucacheblocks.php:422
+#: .././wpucacheblocks.php:430
 #, php-format
 msgid "Expiration: %s"
 msgstr "Expiration : %s"
 
-#: .././wpucacheblocks.php:425
+#: .././wpucacheblocks.php:433
 msgid "Block is cached."
 msgstr "Ce bloc est en cache."
 
-#: .././wpucacheblocks.php:428
+#: .././wpucacheblocks.php:436
 msgid "Cache has expired"
 msgstr "Le cache a expiré"
 
-#: .././wpucacheblocks.php:428
+#: .././wpucacheblocks.php:436
 #, php-format
 msgid "Cache expires in %ss."
 msgstr "Le cache expire dans %ss."
 
-#: .././wpucacheblocks.php:431
+#: .././wpucacheblocks.php:439
 msgid "Block is not cached."
 msgstr "Ce bloc n’est pas en cache."
 
-#: .././wpucacheblocks.php:434
+#: .././wpucacheblocks.php:443
 msgid "Reload"
 msgstr "Recharger"
 
-#: .././wpucacheblocks.php:444
+#: .././wpucacheblocks.php:445
+msgid "A bypass exists for this block. Regeneration is only available in front mode."
+msgstr "Une dérivation existe pour ce bloc. La régénération est uniquement disponible en navigation front."
+
+#: .././wpucacheblocks.php:456
 #, php-format
 msgid "Cache for the block \"%s\" has been rebuilt."
 msgstr "Le cache pour le bloc « %s » a été reconstruit."
 
-#: .././wpucacheblocks.php:459
+#: .././wpucacheblocks.php:471
 msgid "Clear cache"
 msgstr "Vider le cache"
 
-#: .././wpucacheblocks.php:461
+#: .././wpucacheblocks.php:473
 msgid "Rebuild cache"
 msgstr "Reconstruire le cache"
 
-#: .././wpucacheblocks.php:467
+#: .././wpucacheblocks.php:479
 msgid "Cache has been cleared."
 msgstr "Le cache a été vidé."
 
-#: .././wpucacheblocks.php:473
+#: .././wpucacheblocks.php:485
 msgid "Cache has been rebuilt."
 msgstr "Le cache a été reconstruit."

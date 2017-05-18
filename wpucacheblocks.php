@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 0.8.1
+Version: 0.9.0
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -11,7 +11,7 @@ License URI: http://opensource.org/licenses/MIT
 */
 
 class WPUCacheBlocks {
-    private $version = '0.8.1';
+    private $version = '0.9.0';
     private $blocks = array();
     private $cached_blocks = array();
     private $reload_hooks = array();
@@ -232,6 +232,10 @@ class WPUCacheBlocks {
         // Get original block content
         $content = wpucacheblocks_load_html_block_content($this->blocks[$id]['fullpath']);
 
+        if (apply_filters('wpucacheblocks_bypass_cache', false, $id)) {
+            return $content;
+        }
+
         // Keep cache content if needs to be reused
         $this->cached_blocks[$id] = $content;
         if ($this->blocks[$id]['minify']) {
@@ -345,6 +349,10 @@ class WPUCacheBlocks {
             return '';
         }
 
+        if (apply_filters('wpucacheblocks_bypass_cache', false, $id)) {
+            return wpucacheblocks_load_html_block_content($this->blocks[$id]['fullpath']);
+        }
+
         if (!$reload) {
 
             // Cache has already been called on this page
@@ -431,7 +439,11 @@ class WPUCacheBlocks {
                 echo '<br />' . __('Block is not cached.', 'wpucacheblocks');
             }
             echo '<br /><br />';
-            submit_button(__('Reload', 'wpucacheblocks'), 'secondary', 'reload__' . $id, false);
+            if (!apply_filters('wpucacheblocks_bypass_cache', false, $id)) {
+                submit_button(__('Reload', 'wpucacheblocks'), 'secondary', 'reload__' . $id, false);
+            } else {
+                echo __('A bypass exists for this block. Regeneration is only available in front mode.', 'wpucacheblocks');
+            }
             echo '</p>';
             echo '<hr />';
         }
