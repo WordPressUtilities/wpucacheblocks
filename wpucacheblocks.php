@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 0.9.0
+Version: 0.10.0
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -11,7 +11,7 @@ License URI: http://opensource.org/licenses/MIT
 */
 
 class WPUCacheBlocks {
-    private $version = '0.9.0';
+    private $version = '0.10.0';
     private $blocks = array();
     private $cached_blocks = array();
     private $reload_hooks = array();
@@ -27,25 +27,79 @@ class WPUCacheBlocks {
     private $current_lang = false;
 
     public function __construct() {
+        add_action('plugins_loaded', array(&$this, 'plugins_loaded__main'));
         add_action('plugins_loaded', array(&$this, 'plugins_loaded'));
         add_action('plugins_loaded', array(&$this, 'set_reload_front'));
         add_action('template_include', array(&$this, 'generate_reload_front'));
     }
 
-    public function plugins_loaded() {
+    public function plugins_loaded__main() {
         load_plugin_textdomain('wpucacheblocks', false, dirname(plugin_basename(__FILE__)) . '/lang/');
 
         // Options
         $this->options = array(
             'basename' => plugin_basename(__FILE__),
             'id' => 'wpucacheblocks',
+            'plugin_id' => 'wpucacheblocks',
             'name' => 'WPU Cache Blocks',
             'level' => 'manage_options'
         );
 
+        ## INIT ##
+        $this->settings_details = array(
+            # Default
+            'plugin_id' => 'wpucacheblocks',
+            'option_id' => 'wpucacheblocks_options',
+            'user_cap' => 'manage_options',
+            'sections' => array(
+                'settings' => array(
+                    'name' => __('Settings', 'wpucacheblocks')
+                )
+            )
+        );
+        $this->settings = array(
+            'disable' => array(
+                'label' => __('Disable', 'wpucacheblocks'),
+                'help' => __('Disable cache blocks for everyone.', 'wpucacheblocks'),
+                'type' => 'select'
+            ),
+            'disable_admins' => array(
+                'label' => __('Disable for admins', 'wpucacheblocks'),
+                'help' => __('Disable cache blocks for users with an administrator level.', 'wpucacheblocks'),
+                'type' => 'select'
+            )
+        );
+
+        // Settings
+        $this->languages = get_available_languages();
+        if (!in_array('en_US', $this->languages)) {
+            $this->languages[] = 'en_US';
+        }
+        $this->check_cache_conf();
+        $this->blocks = $this->load_blocks_list();
+        foreach ($this->reload_hooks as $hook) {
+            add_action($hook, array(&$this, 'reload_hooks'));
+        }
+
+        $config = get_option($this->settings_details['option_id']);
+        if (!is_array($config)) {
+            $config = array();
+        }
+        $this->config = apply_filters('wpucacheblocks_config', $config);
+        $this->config__disable = (isset($this->config['disable']) && $this->config['disable'] == '1');
+        $this->config__disable_admins = (isset($this->config['disable_admins']) && $this->config['disable_admins'] == '1');
+
+    }
+
+    public function plugins_loaded() {
+
         // Messages
         include 'inc/WPUBaseMessages/WPUBaseMessages.php';
         $this->messages = new \wpucacheblocks\WPUBaseMessages($this->options['id']);
+
+        if (!is_admin()) {
+            return;
+        }
 
         include 'inc/WPUBaseAdminPage/WPUBaseAdminPage.php';
         $admin_pages = array(
@@ -63,12 +117,23 @@ class WPUCacheBlocks {
                     array('admin_enqueue_scripts', array(&$this, 'admin_enqueue_scripts'))
                 )
             ),
+            'settings' => array(
+                'parent' => 'main',
+                'name' => __('Settings', 'wpucacheblocks'),
+                'page_title' => sprintf(__('%s - Settings', 'wpucacheblocks'), $this->options['name']),
+                'has_form' => false,
+                'settings_link' => true,
+                'settings_name' => __('Settings', 'wpucacheblocks'),
+                'function_content' => array(&$this,
+                    'page_content__settings'
+                )
+            ),
             'actions' => array(
                 'parent' => 'main',
                 'name' => __('Actions', 'wpucacheblocks'),
                 'page_title' => sprintf(__('%s - Actions', 'wpucacheblocks'), $this->options['name']),
                 'settings_link' => true,
-                'settings_name' => 'Settings',
+                'settings_name' => __('Actions', 'wpucacheblocks'),
                 'function_content' => array(&$this,
                     'page_content__actions'
                 ),
@@ -78,20 +143,18 @@ class WPUCacheBlocks {
             )
         );
 
+        include 'inc/WPUBaseSettings/WPUBaseSettings.php';
+        $settings_obj = new \wpucacheblocks\WPUBaseSettings($this->settings_details, $this->settings);
+
+        ## if no auto create_page and medias ##
+        if (isset($_GET['page']) && $_GET['page'] == 'wpucacheblocks-main') {
+            add_action('admin_init', array(&$settings_obj, 'load_assets'));
+        }
+
         // Init admin page
         $this->adminpages = new \wpucacheblocks\WPUBaseAdminPage();
         $this->adminpages->init($this->options, $admin_pages);
 
-        // Settings
-        $this->languages = get_available_languages();
-        if (!in_array('en_US', $this->languages)) {
-            $this->languages[] = 'en_US';
-        }
-        $this->check_cache_conf();
-        $this->blocks = $this->load_blocks_list();
-        foreach ($this->reload_hooks as $hook) {
-            add_action($hook, array(&$this, 'reload_hooks'));
-        }
     }
 
     /**
@@ -349,7 +412,23 @@ class WPUCacheBlocks {
             return '';
         }
 
+        $bypass_cache = false;
+
+        // Disable if setting
+        if ($this->config__disable) {
+            $bypass_cache = true;
+        }
+
+        // Disable if admin & setting
+        if ($this->config__disable_admins && current_user_can('administrator')) {
+            $bypass_cache = true;
+        }
+
         if (apply_filters('wpucacheblocks_bypass_cache', false, $id)) {
+            $bypass_cache = true;
+        }
+
+        if ($bypass_cache) {
             return wpucacheblocks_load_html_block_content($this->blocks[$id]['fullpath']);
         }
 
@@ -422,7 +501,7 @@ class WPUCacheBlocks {
 
     public function page_content__main() {
 
-        echo '<h3>Blocks</h3>';
+        echo '<h3>' . __('Blocks', 'wpucacheblocks') . '</h3>';
         foreach ($this->blocks as $id => $block) {
             echo '<p>';
             echo '<strong>' . $id . ' - ' . $block['path'] . '</strong><br />';
@@ -462,6 +541,17 @@ class WPUCacheBlocks {
         wp_enqueue_script('wpucacheblocks-main', plugins_url('/assets/main.js', __FILE__), array(
             'jquery'
         ), $this->version, true);
+    }
+
+    /* Settings
+    -------------------------- */
+
+    public function page_content__settings() {
+        echo '<form action="' . admin_url('options.php') . '" method="post">';
+        settings_fields($this->settings_details['option_id']);
+        do_settings_sections($this->options['plugin_id']);
+        echo submit_button(__('Save Changes', 'wpucacheblocks'));
+        echo '</form>';
     }
 
     /* Actions

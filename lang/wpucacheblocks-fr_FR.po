@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: \n"
-"POT-Creation-Date: 2017-05-18 23:24+0200\n"
+"POT-Creation-Date: 2017-05-24 17:38+0200\n"
 "PO-Revision-Date: \n"
 "Last-Translator: Darklg <darklg.blog@gmail.com>\n"
 "Language-Team: \n"
@@ -19,79 +19,148 @@ msgstr ""
 msgid "Help"
 msgstr "Aide"
 
-#: .././wpucacheblocks.php:53
+#: .././inc/WPUBaseSettings/WPUBaseSettings.php:81
+msgid "Import Settings"
+msgstr "Réglages"
+
+#: .././inc/WPUBaseSettings/WPUBaseSettings.php:98
+#: .././inc/WPUBaseSettings/WPUBaseSettings.php:389 .././wpucacheblocks.php:56
+#: .././wpucacheblocks.php:122 .././wpucacheblocks.php:126
+msgid "Settings"
+msgstr "Réglages"
+
+#: .././inc/WPUBaseSettings/WPUBaseSettings.php:125
+msgid "No"
+msgstr "Non"
+
+#: .././inc/WPUBaseSettings/WPUBaseSettings.php:125
+msgid "Yes"
+msgstr "Oui"
+
+#: .././inc/WPUBaseSettings/WPUBaseSettings.php:223
+msgid "Settings saved."
+msgstr "Réglages enregistrés."
+
+#: .././inc/WPUBaseSettings/WPUBaseSettings.php:261
+msgid "Upload New Media"
+msgstr "Ajouter un nouveau média"
+
+#: .././inc/WPUBaseSettings/WPUBaseSettings.php:403
+msgid "Save"
+msgstr "Enregistrer"
+
+#: .././wpucacheblocks.php:62
+msgid "Disable"
+msgstr "Désactiver"
+
+#: .././wpucacheblocks.php:63
+msgid "Disable cache blocks for everyone."
+msgstr "Désactiver les blocs de cache pour tout le monde."
+
+#: .././wpucacheblocks.php:67
+msgid "Disable for admins"
+msgstr "Désactiver pour les admins"
+
+#: .././wpucacheblocks.php:68
+msgid "Disable cache blocks for users with an administrator level."
+msgstr ""
+"Désactiver les blocs de cache pour les utilisateurs avec un niveau "
+"d’administrateur."
+
+#: .././wpucacheblocks.php:107
 msgid "Cache blocks"
 msgstr "Cache blocks"
 
-#: .././wpucacheblocks.php:54
+#: .././wpucacheblocks.php:108
 #, php-format
 msgid "%s - Block list"
 msgstr "%s - Liste des blocs"
 
-#: .././wpucacheblocks.php:55
+#: .././wpucacheblocks.php:109
 msgid "Block list"
 msgstr "Liste des blocs"
 
-#: .././wpucacheblocks.php:68
+#: .././wpucacheblocks.php:123
+#, php-format
+msgid "%s - Settings"
+msgstr "%s - Réglages"
+
+#: .././wpucacheblocks.php:133 .././wpucacheblocks.php:136
 msgid "Actions"
 msgstr "Actions"
 
-#: .././wpucacheblocks.php:69
+#: .././wpucacheblocks.php:134
 #, php-format
 msgid "%s - Actions"
 msgstr "%s - Actions"
 
-#: .././wpucacheblocks.php:429
+#: .././wpucacheblocks.php:504
+msgid "Blocks"
+msgstr "Blocks"
+
+#: .././wpucacheblocks.php:508
 msgid "never"
 msgstr "jamais"
 
-#: .././wpucacheblocks.php:430
+#: .././wpucacheblocks.php:509
 #, php-format
 msgid "Expiration: %s"
 msgstr "Expiration : %s"
 
-#: .././wpucacheblocks.php:433
+#: .././wpucacheblocks.php:512
 msgid "Block is cached."
 msgstr "Ce bloc est en cache."
 
-#: .././wpucacheblocks.php:436
+#: .././wpucacheblocks.php:515
 msgid "Cache has expired"
 msgstr "Le cache a expiré"
 
-#: .././wpucacheblocks.php:436
+#: .././wpucacheblocks.php:515
 #, php-format
 msgid "Cache expires in %ss."
 msgstr "Le cache expire dans %ss."
 
-#: .././wpucacheblocks.php:439
+#: .././wpucacheblocks.php:518
 msgid "Block is not cached."
 msgstr "Ce bloc n’est pas en cache."
 
-#: .././wpucacheblocks.php:443
+#: .././wpucacheblocks.php:522
 msgid "Reload"
 msgstr "Recharger"
 
-#: .././wpucacheblocks.php:445
-msgid "A bypass exists for this block. Regeneration is only available in front mode."
-msgstr "Une dérivation existe pour ce bloc. La régénération est uniquement disponible en navigation front."
+#: .././wpucacheblocks.php:524
+msgid ""
+"A bypass exists for this block. Regeneration is only available in front mode."
+msgstr ""
+"Une dérivation existe pour ce bloc. La régénération est uniquement "
+"disponible en navigation front."
 
-#: .././wpucacheblocks.php:456
+#: .././wpucacheblocks.php:535
 #, php-format
 msgid "Cache for the block \"%s\" has been rebuilt."
 msgstr "Le cache pour le bloc « %s » a été reconstruit."
 
-#: .././wpucacheblocks.php:471
+#: .././wpucacheblocks.php:553
+msgid "Save Changes"
+msgstr "Sauvegarder"
+
+#: .././wpucacheblocks.php:561
 msgid "Clear cache"
 msgstr "Vider le cache"
 
-#: .././wpucacheblocks.php:473
+#: .././wpucacheblocks.php:563
 msgid "Rebuild cache"
 msgstr "Reconstruire le cache"
 
-#: .././wpucacheblocks.php:479
+#: .././wpucacheblocks.php:569
 msgid "Cache has been cleared."
 msgstr "Le cache a été vidé."
 
-#: .././wpucacheblocks.php:485
+#: .././wpucacheblocks.php:575
 msgid "Cache has been rebuilt."
 msgstr "Le cache a été reconstruit."
+
+#~ msgid "Disable cache blocks for users with an admin level"
+#~ msgstr ""
+#~ "Désactiver les blocs de cache pour les utilisateurs avec un niveau "
+#~ "administrateur."
