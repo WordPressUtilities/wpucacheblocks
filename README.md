@@ -40,9 +40,13 @@ You can also use 'fullpath', which is an absolute path to the file that will be 
 Duration in seconds after which the block will be refreshed.
 If 0, the block will never be refreshed in front, only via a hook.
 
-#### reload_hooks (array)
+#### reload_hooks (array of callbacks)
 
 An array of hooks that will trigger a refresh for the block.
+
+#### callback_prefix (callback function)
+
+A callback for a function to prefix version of each cached block.
 
 ## How to display a block content.
 

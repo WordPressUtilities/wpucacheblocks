@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 0.10.0
+Version: 0.11.0
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -11,7 +11,7 @@ License URI: http://opensource.org/licenses/MIT
 */
 
 class WPUCacheBlocks {
-    private $version = '0.10.0';
+    private $version = '0.11.0';
     private $blocks = array();
     private $cached_blocks = array();
     private $reload_hooks = array();
@@ -285,10 +285,11 @@ class WPUCacheBlocks {
      */
     public function save_block_in_cache($id = '', $lang = false) {
 
-        $prefix = '';
-        if ($lang !== false) {
-            $prefix = $lang . '__';
+        if (!isset($this->blocks[$id])) {
+            return '';
         }
+
+        $prefix = $this->get_current_block_prefix($id, $lang);
 
         $expires = $this->blocks[$id]['expires'];
 
@@ -331,10 +332,11 @@ class WPUCacheBlocks {
      */
     public function get_cache_content($id = '', $lang = false) {
 
-        $prefix = '';
-        if ($lang !== false) {
-            $prefix = $lang . '__';
+        if (!isset($this->blocks[$id])) {
+            return '';
         }
+
+        $prefix = $this->get_current_block_prefix($id, $lang);
 
         switch ($this->cache_type) {
         case 'apc':
@@ -404,13 +406,15 @@ class WPUCacheBlocks {
     /**
      * Get content of the block, cached or regenerate
      * @param  string  $id      ID of the block.
+     * @param  mixed   $lang    false|string : Current language.
      * @param  boolean $reload  Force regeneration of this block.
      * @return string           Content of the block.
      */
-    public function get_block_content($id, $reload = false) {
+    public function get_block_content($id, $lang = false, $reload = false) {
         if (!isset($this->blocks[$id])) {
             return '';
         }
+        $prefix = $this->get_current_block_prefix($id, $lang);
 
         $bypass_cache = false;
 
@@ -435,22 +439,45 @@ class WPUCacheBlocks {
         if (!$reload) {
 
             // Cache has already been called on this page
-            if (isset($this->cached_blocks[$id])) {
-                return $this->cached_blocks[$id];
+            if (isset($this->cached_blocks[$prefix . $id])) {
+                return $this->cached_blocks[$prefix . $id];
             }
 
             // Get cached version if exists
-            $content = $this->get_cache_content($id);
+            $content = $this->get_cache_content($id, $lang);
             if ($content !== false) {
-                $this->cached_blocks[$id] = $content;
+                $this->cached_blocks[$prefix . $id] = $content;
                 return $content;
             }
         }
 
         // Save cache
-        $content = $this->save_block_in_cache($id);
+        $content = $this->save_block_in_cache($id, $lang);
 
         return $content;
+    }
+
+    /* ----------------------------------------------------------
+      Prefix
+    ---------------------------------------------------------- */
+
+    /**
+     * Get block prefix
+     * @param  string $id     ID of the block.
+     * @param  mixed  $lang   false|string : Current language.
+     * @return string         Prefix
+     */
+    public function get_current_block_prefix($id = '', $lang = false) {
+        $prefix = '';
+        if ($lang !== false) {
+            $prefix = $lang . '__';
+        }
+
+        if (!is_admin() && isset($this->blocks[$id]['callback_prefix']) && is_callable($this->blocks[$id]['callback_prefix'])) {
+            $prefix = call_user_func($this->blocks[$id]['callback_prefix'], $prefix);
+        }
+
+        return $prefix;
     }
 
     /* ----------------------------------------------------------
@@ -611,7 +638,7 @@ function wpucacheblocks_load_html_block_content($path) {
  * @param  string $block_id  ID of the block.
  * @return string            Content of the block.
  */
-function wpucacheblocks_block($block_id = '') {
+function wpucacheblocks_block($block_id = '', $lang = false) {
     global $WPUCacheBlocks;
-    return $WPUCacheBlocks->get_block_content($block_id);
+    return $WPUCacheBlocks->get_block_content($block_id, $lang);
 }
