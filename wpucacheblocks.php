@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 0.11.0
+Version: 0.12.0
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -11,7 +11,7 @@ License URI: http://opensource.org/licenses/MIT
 */
 
 class WPUCacheBlocks {
-    private $version = '0.11.0';
+    private $version = '0.12.0';
     private $blocks = array();
     private $cached_blocks = array();
     private $reload_hooks = array();
@@ -34,6 +34,7 @@ class WPUCacheBlocks {
     }
 
     public function plugins_loaded__main() {
+
         load_plugin_textdomain('wpucacheblocks', false, dirname(plugin_basename(__FILE__)) . '/lang/');
 
         // Options
@@ -71,6 +72,7 @@ class WPUCacheBlocks {
         );
 
         // Settings
+        $this->cache_type = apply_filters('wpucacheblocks_cachetype', $this->cache_type);
         $this->languages = get_available_languages();
         if (!in_array('en_US', $this->languages)) {
             $this->languages[] = 'en_US';
@@ -169,7 +171,6 @@ class WPUCacheBlocks {
         $this->cache_prefix = preg_replace("/[^a-z0-9_]/", '', $this->cache_prefix);
 
         /* Config cache type */
-        $this->cache_type = apply_filters('wpucacheblocks_cachetype', $this->cache_type);
         if (!in_array($this->cache_type, $this->cache_types)) {
             $this->cache_type = $this->cache_types[0];
         }
@@ -196,10 +197,48 @@ class WPUCacheBlocks {
         $current_filter = current_filter();
         foreach ($this->blocks as $id => $block) {
             /* If block should be reloaded at current filter */
-            if (in_array($current_filter, $block['reload_hooks'])) {
+            if (!in_array($current_filter, $block['reload_hooks'])) {
+                continue;
+            }
+            /* A Callback is available : just delete this block */
+            if (isset($this->blocks[$id]['callback_prefix'])) {
+                $this->clear_block_from_cache($id);
+            } else {
                 $this->save_block_in_cache($id);
             }
         }
+    }
+
+    public function clear_block_from_cache($id) {
+        if (!isset($this->blocks[$id])) {
+            return;
+        }
+
+        /* For every callback */
+        $callbacks = array(false);
+
+        if (isset($this->blocks[$id]['callback_values'])) {
+            $callbacks = $this->blocks[$id]['callback_values'];
+        }
+
+        foreach ($callbacks as $manual_callback) {
+            /* For every lang */
+            foreach ($this->languages as $lang) {
+                $prefix = $this->get_current_block_prefix($id, $lang, $manual_callback);
+                $cache_key = $this->get_cache_block_id($prefix, $id);
+                switch ($this->cache_type) {
+                case 'apc':
+                    apc_delete($cache_key);
+                    break;
+                default:
+                    if (file_exists($cache_key)) {
+                        unlink($cache_key);
+                    }
+
+                }
+            }
+        }
+
     }
 
     public function clear_cache() {
@@ -311,10 +350,10 @@ class WPUCacheBlocks {
 
         switch ($this->cache_type) {
         case 'apc':
-            apc_store($this->cache_prefix . $prefix . $id, $content, $expires);
+            apc_store($this->get_cache_block_id($prefix, $id), $content, $expires);
             break;
         default:
-            $cache_file = str_replace('#id#', $prefix . $id, $this->cache_file);
+            $cache_file = $this->get_cache_block_id($prefix, $id);
             if (file_exists($cache_file)) {
                 unlink($cache_file);
             }
@@ -322,6 +361,21 @@ class WPUCacheBlocks {
         }
 
         return $content;
+    }
+
+    /**
+     * Get the ID for a cache block
+     * @param  string $prefix   Prefix for this block
+     * @param  string $id       ID of this block.
+     * @return string           APC ID or cache file.
+     */
+    public function get_cache_block_id($prefix, $id) {
+        switch ($this->cache_type) {
+        case 'apc':
+            return $this->cache_prefix . $prefix . $id;
+            break;
+        }
+        return str_replace('#id#', $prefix . $id, $this->cache_file);
     }
 
     /**
@@ -340,10 +394,10 @@ class WPUCacheBlocks {
 
         switch ($this->cache_type) {
         case 'apc':
-            return apc_fetch($this->cache_prefix . $prefix . $id);
+            return apc_fetch($this->get_cache_block_id($prefix, $id));
             break;
         default:
-            $cache_file = str_replace('#id#', $prefix . $id, $this->cache_file);
+            $cache_file = $this->get_cache_block_id($prefix, $id);
 
             /* Cache does not exists */
             if (!file_exists($cache_file)) {
@@ -389,7 +443,7 @@ class WPUCacheBlocks {
 
             break;
         default:
-            $cache_file = str_replace('#id#', $id, $this->cache_file);
+            $cache_file = $this->get_cache_block_id($prefix, $id);
 
             /* Cache does not exists */
             if (!file_exists($cache_file)) {
@@ -467,14 +521,19 @@ class WPUCacheBlocks {
      * @param  mixed  $lang   false|string : Current language.
      * @return string         Prefix
      */
-    public function get_current_block_prefix($id = '', $lang = false) {
+    public function get_current_block_prefix($id = '', $lang = false, $manual_callback = false) {
         $prefix = '';
         if ($lang !== false) {
             $prefix = $lang . '__';
         }
 
-        if (!is_admin() && isset($this->blocks[$id]['callback_prefix']) && is_callable($this->blocks[$id]['callback_prefix'])) {
-            $prefix = call_user_func($this->blocks[$id]['callback_prefix'], $prefix);
+        /* Allow a callback emulation for cache deletion */
+        if ($manual_callback === false) {
+            if (!is_admin() && isset($this->blocks[$id]['callback_prefix']) && is_callable($this->blocks[$id]['callback_prefix'])) {
+                $prefix = call_user_func($this->blocks[$id]['callback_prefix'], $prefix);
+            }
+        } else {
+            $prefix = $manual_callback;
         }
 
         return $prefix;
@@ -546,7 +605,11 @@ class WPUCacheBlocks {
             }
             echo '<br /><br />';
             if (!apply_filters('wpucacheblocks_bypass_cache', false, $id)) {
-                submit_button(__('Reload', 'wpucacheblocks'), 'secondary', 'reload__' . $id, false);
+                if (isset($block['callback_prefix'])) {
+                    submit_button(__('Clear', 'wpucacheblocks'), 'secondary', 'clear__' . $id, false);
+                } else {
+                    submit_button(__('Reload', 'wpucacheblocks'), 'secondary', 'reload__' . $id, false);
+                }
             } else {
                 echo __('A bypass exists for this block. Regeneration is only available in front mode.', 'wpucacheblocks');
             }
@@ -560,6 +623,10 @@ class WPUCacheBlocks {
             if (isset($_POST['reload__' . $id])) {
                 $this->save_block_in_cache($id);
                 $this->messages->set_message('rebuilt_cache__' . $id, sprintf(__('Cache for the block "%s" has been rebuilt.', 'wpucacheblocks'), $id));
+            }
+            if (isset($_POST['clear__' . $id])) {
+                $this->clear_block_from_cache($id);
+                $this->messages->set_message('rebuilt_cache__' . $id, sprintf(__('Cache for the block "%s" has been cleared.', 'wpucacheblocks'), $id));
             }
         }
     }
