@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 0.12.0
+Version: 1.0.0
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -11,7 +11,7 @@ License URI: http://opensource.org/licenses/MIT
 */
 
 class WPUCacheBlocks {
-    private $version = '0.12.0';
+    private $version = '1.0.0';
     private $blocks = array();
     private $cached_blocks = array();
     private $reload_hooks = array();
@@ -74,9 +74,6 @@ class WPUCacheBlocks {
         // Settings
         $this->cache_type = apply_filters('wpucacheblocks_cachetype', $this->cache_type);
         $this->languages = get_available_languages();
-        if (!in_array('en_US', $this->languages)) {
-            $this->languages[] = 'en_US';
-        }
         $this->check_cache_conf();
         $this->blocks = $this->load_blocks_list();
         foreach ($this->reload_hooks as $hook) {
@@ -106,6 +103,7 @@ class WPUCacheBlocks {
         include 'inc/WPUBaseAdminPage/WPUBaseAdminPage.php';
         $admin_pages = array(
             'main' => array(
+                'icon_url' => 'dashicons-tagcloud',
                 'menu_name' => __('Cache blocks', 'wpucacheblocks'),
                 'page_title' => sprintf(__('%s - Block list', 'wpucacheblocks'), $this->options['name']),
                 'name' => __('Block list', 'wpucacheblocks'),
@@ -214,31 +212,20 @@ class WPUCacheBlocks {
             return;
         }
 
-        /* For every callback */
-        $callbacks = array(false);
+        $prefixes = $this->get_block_prefixes($id);
 
-        if (isset($this->blocks[$id]['callback_values'])) {
-            $callbacks = $this->blocks[$id]['callback_values'];
-        }
-
-        foreach ($callbacks as $manual_callback) {
-            /* For every lang */
-            foreach ($this->languages as $lang) {
-                $prefix = $this->get_current_block_prefix($id, $lang, $manual_callback);
-                $cache_key = $this->get_cache_block_id($prefix, $id);
-                switch ($this->cache_type) {
-                case 'apc':
-                    apc_delete($cache_key);
-                    break;
-                default:
-                    if (file_exists($cache_key)) {
-                        unlink($cache_key);
-                    }
-
+        foreach ($prefixes as $prefix) {
+            $cache_key = $this->get_cache_block_id($prefix['prefix'], $id);
+            switch ($this->cache_type) {
+            case 'apc':
+                apc_delete($cache_key);
+                break;
+            default:
+                if (file_exists($cache_key)) {
+                    unlink($cache_key);
                 }
             }
         }
-
     }
 
     public function clear_cache() {
@@ -328,6 +315,10 @@ class WPUCacheBlocks {
             return '';
         }
 
+        if ($lang === false) {
+            $lang = get_locale();
+        }
+
         $prefix = $this->get_current_block_prefix($id, $lang);
 
         $expires = $this->blocks[$id]['expires'];
@@ -348,16 +339,16 @@ class WPUCacheBlocks {
             $content = implode("\n", array_map('trim', explode("\n", $content)));
         }
 
+        $cache_id = $this->get_cache_block_id($prefix, $id);
         switch ($this->cache_type) {
         case 'apc':
-            apc_store($this->get_cache_block_id($prefix, $id), $content, $expires);
+            apc_store($cache_id, $content, $expires);
             break;
         default:
-            $cache_file = $this->get_cache_block_id($prefix, $id);
-            if (file_exists($cache_file)) {
-                unlink($cache_file);
+            if (file_exists($cache_id)) {
+                unlink($cache_id);
             }
-            file_put_contents($cache_file, $content);
+            file_put_contents($cache_id, $content);
         }
 
         return $content;
@@ -384,13 +375,13 @@ class WPUCacheBlocks {
      * @param  mixed  $lang  false|string : Current language.
      * @return mixed         false|string : false if invalid cache, string of cached content if valid.
      */
-    public function get_cache_content($id = '', $lang = false) {
+    public function get_cache_content($id = '', $lang = false, $manual_callback = false) {
 
         if (!isset($this->blocks[$id])) {
             return '';
         }
 
-        $prefix = $this->get_current_block_prefix($id, $lang);
+        $prefix = $this->get_current_block_prefix($id, $lang, $manual_callback);
 
         switch ($this->cache_type) {
         case 'apc':
@@ -398,7 +389,6 @@ class WPUCacheBlocks {
             break;
         default:
             $cache_file = $this->get_cache_block_id($prefix, $id);
-
             /* Cache does not exists */
             if (!file_exists($cache_file)) {
                 return false;
@@ -419,13 +409,17 @@ class WPUCacheBlocks {
     /**
      * Get cache expiration date
      * @param  string $id   ID of the block.
+     * @param  mixed  $lang  false|string : Current language.
      * @return mixed        false|int : false if invalid cache, int: expiration date if valid.
      */
-    public function get_cache_expiration($id = '') {
+    public function get_cache_expiration($id = '', $lang = false, $manual_callback = false) {
 
         if ($this->blocks[$id]['expires'] === false) {
             return false;
         }
+
+        $prefix = $this->get_current_block_prefix($id, $lang, $manual_callback);
+        $cache_id = $this->get_cache_block_id($prefix, $id);
 
         switch ($this->cache_type) {
         case 'apc':
@@ -436,21 +430,20 @@ class WPUCacheBlocks {
             }
 
             foreach ($cache_info['cache_list'] as $cache_item) {
-                if ($cache_item['info'] == $this->cache_prefix . $id) {
+                if ($cache_item['info'] == $cache_id) {
                     return $this->blocks[$id]['expires'] - time() + $cache_item['mtime'];
                 }
             }
 
             break;
         default:
-            $cache_file = $this->get_cache_block_id($prefix, $id);
 
             /* Cache does not exists */
-            if (!file_exists($cache_file)) {
+            if (!file_exists($cache_id)) {
                 return false;
             }
 
-            return $this->blocks[$id]['expires'] - time() + filemtime($cache_file);
+            return $this->blocks[$id]['expires'] - time() + filemtime($cache_id);
 
         }
 
@@ -468,6 +461,11 @@ class WPUCacheBlocks {
         if (!isset($this->blocks[$id])) {
             return '';
         }
+
+        if ($lang === false) {
+            $lang = get_locale();
+        }
+
         $prefix = $this->get_current_block_prefix($id, $lang);
 
         $bypass_cache = false;
@@ -522,6 +520,11 @@ class WPUCacheBlocks {
      * @return string         Prefix
      */
     public function get_current_block_prefix($id = '', $lang = false, $manual_callback = false) {
+
+        if (!isset($this->blocks[$id])) {
+            return false;
+        }
+
         $prefix = '';
         if ($lang !== false) {
             $prefix = $lang . '__';
@@ -537,6 +540,35 @@ class WPUCacheBlocks {
         }
 
         return $prefix;
+    }
+
+    public function get_block_prefixes($id) {
+        if (!isset($this->blocks[$id])) {
+            return array();
+        }
+
+        /* For every callback */
+        $callbacks = array(false);
+
+        if (isset($this->blocks[$id]['callback_values'])) {
+            $callbacks = $this->blocks[$id]['callback_values'];
+        }
+        $prefixes = array();
+        foreach ($callbacks as $manual_callback) {
+            /* For every lang */
+            foreach ($this->languages as $lang) {
+
+                $prefix = $this->get_current_block_prefix($id, $lang, $manual_callback);
+                $pref_lang = $lang;
+                /* Prefix already exists : lang is deleted by the callback so we remove it */
+                if (array_key_exists($prefix, $prefixes)) {
+                    $pref_lang = '';
+                }
+                $prefixes[$prefix] = array('prefix' => $prefix, 'lang' => $pref_lang, 'manual_callback' => $manual_callback);
+            }
+        }
+
+        return $prefixes;
     }
 
     /* ----------------------------------------------------------
@@ -593,17 +625,14 @@ class WPUCacheBlocks {
             echo '<strong>' . $id . ' - ' . $block['path'] . '</strong><br />';
             $_expiration = (is_bool($block['expires']) ? __('never', 'wpucacheblocks') : $block['expires'] . 's');
             echo sprintf(__('Expiration: %s', 'wpucacheblocks'), $_expiration);
-            $cache_status = $this->get_cache_content($id);
-            if ($cache_status !== false) {
-                echo '<br />' . __('Block is cached.', 'wpucacheblocks');
-                $cache_expiration = $this->get_cache_expiration($id);
-                if ($cache_expiration !== false) {
-                    echo '<span style="display:block;" data-wpucacheblockscounterempty="' . __('Cache has expired', 'wpucacheblocks') . '">' . sprintf(__('Cache expires in %ss.', 'wpucacheblocks'), '<span data-wpucacheblockscounter="' . $cache_expiration . '">' . $cache_expiration . '</span>') . '</span>';
-                }
-            } else {
-                echo '<br />' . __('Block is not cached.', 'wpucacheblocks');
+
+            $prefixes = $this->get_block_prefixes($id);
+
+            foreach ($prefixes as $prefix) {
+                echo $this->display_block_cache_status($id, $prefix);
             }
-            echo '<br /><br />';
+
+            echo '<br />';
             if (!apply_filters('wpucacheblocks_bypass_cache', false, $id)) {
                 if (isset($block['callback_prefix'])) {
                     submit_button(__('Clear', 'wpucacheblocks'), 'secondary', 'clear__' . $id, false);
@@ -616,6 +645,22 @@ class WPUCacheBlocks {
             echo '</p>';
             echo '<hr />';
         }
+    }
+
+    public function display_block_cache_status($id, $prefix = false) {
+        $html_content = '';
+        $cache_status = $this->get_cache_content($id, $prefix['lang'], $prefix['manual_callback']);
+        $html_content .= $prefix['lang'] . ' ' . $prefix['manual_callback'] . ' : ';
+        if ($cache_status !== false) {
+            $html_content .= __('Block is cached.', 'wpucacheblocks');
+            $cache_expiration = $this->get_cache_expiration($id, $prefix['lang'], $prefix['manual_callback']);
+            if ($cache_expiration !== false) {
+                $html_content .= ' <span data-wpucacheblockscounterempty="' . __('Cache has expired', 'wpucacheblocks') . '">' . sprintf(__('Cache expires in %ss.', 'wpucacheblocks'), '<span data-wpucacheblockscounter="' . $cache_expiration . '">' . $cache_expiration . '</span>') . '</span>';
+            }
+        } else {
+            $html_content .= __('Block is not cached.', 'wpucacheblocks');
+        }
+        return '<span style="display: block;">' . $html_content . '</span>';
     }
 
     public function page_action__main() {
