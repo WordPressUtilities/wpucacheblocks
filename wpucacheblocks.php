@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 1.0.0
+Version: 1.0.1
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -11,7 +11,7 @@ License URI: http://opensource.org/licenses/MIT
 */
 
 class WPUCacheBlocks {
-    private $version = '1.0.0';
+    private $version = '1.0.1';
     private $blocks = array();
     private $cached_blocks = array();
     private $reload_hooks = array();
@@ -31,6 +31,7 @@ class WPUCacheBlocks {
         add_action('plugins_loaded', array(&$this, 'plugins_loaded'));
         add_action('plugins_loaded', array(&$this, 'set_reload_front'));
         add_action('template_include', array(&$this, 'generate_reload_front'));
+        add_action('wpucacheblocks_clearcache', array(&$this, 'clear_cache'));
     }
 
     public function plugins_loaded__main() {
