@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 1.0.1
+Version: 1.1.0
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -11,7 +11,7 @@ License URI: http://opensource.org/licenses/MIT
 */
 
 class WPUCacheBlocks {
-    private $version = '1.0.1';
+    private $version = '1.1.0';
     private $blocks = array();
     private $cached_blocks = array();
     private $reload_hooks = array();
@@ -20,7 +20,7 @@ class WPUCacheBlocks {
     private $cache_type = 'file';
     private $cache_prefix = 'wpucacheblocks_';
     private $base_cache_prefix = 'wpucacheblocks_';
-    private $cache_types = array('file', 'apc');
+    private $cache_types = array('file', 'apc', 'wp');
     private $options = array();
     private $languages = array();
     private $current_block = false;
@@ -174,9 +174,16 @@ class WPUCacheBlocks {
             $this->cache_type = $this->cache_types[0];
         }
 
+        /* If WP, check if a plugin is installed */
+        if ($this->cache_type == 'wp' && !wp_using_ext_object_cache()) {
+            error_log('[WPUCACHEBLOCKS] You need to install a WP Cache extension to use this cache method.');
+            $this->cache_type = $this->cache_types[0];
+        }
+
         /* If APC, check if enabled */
         if ($this->cache_type == 'apc' && (!extension_loaded('apc') || !ini_get('apc.enabled'))) {
             $this->cache_type = $this->cache_types[0];
+            error_log('[WPUCACHEBLOCKS] You need to install APC to use this cache method.');
         }
 
         /* Check if cache dir exists */
@@ -221,6 +228,9 @@ class WPUCacheBlocks {
             case 'apc':
                 apc_delete($cache_key);
                 break;
+            case 'wp':
+                wp_cache_delete($cache_key);
+                break;
             default:
                 if (file_exists($cache_key)) {
                     unlink($cache_key);
@@ -242,6 +252,19 @@ class WPUCacheBlocks {
                 /* Delete block cache */
                 if (substr($item['info'], 0, $prefix_len) == $this->base_cache_prefix) {
                     apc_delete($item['info']);
+                }
+            }
+            break;
+
+        case 'wp':
+            foreach ($this->blocks as $id => $block) {
+                $this->clear_block_from_cache($id);
+            }
+            global $wp_object_cache;
+            foreach ($wp_object_cache->cache as $key => $group) {
+                if (strpos($key, 'wpucacheblocks') !== false) {
+                    $cache_key = end(explode(':', $key));
+                    wp_cache_delete($cache_key);
                 }
             }
             break;
@@ -345,6 +368,9 @@ class WPUCacheBlocks {
         case 'apc':
             apc_store($cache_id, $content, $expires);
             break;
+        case 'wp':
+            wp_cache_add($cache_id, $content, '', $expires);
+            break;
         default:
             if (file_exists($cache_id)) {
                 unlink($cache_id);
@@ -363,6 +389,7 @@ class WPUCacheBlocks {
      */
     public function get_cache_block_id($prefix, $id) {
         switch ($this->cache_type) {
+        case 'wp':
         case 'apc':
             return $this->cache_prefix . $prefix . $id;
             break;
@@ -387,6 +414,9 @@ class WPUCacheBlocks {
         switch ($this->cache_type) {
         case 'apc':
             return apc_fetch($this->get_cache_block_id($prefix, $id));
+            break;
+        case 'wp':
+            return wp_cache_get($this->get_cache_block_id($prefix, $id));
             break;
         default:
             $cache_file = $this->get_cache_block_id($prefix, $id);
@@ -654,9 +684,12 @@ class WPUCacheBlocks {
         $html_content .= $prefix['lang'] . ' ' . $prefix['manual_callback'] . ' : ';
         if ($cache_status !== false) {
             $html_content .= __('Block is cached.', 'wpucacheblocks');
-            $cache_expiration = $this->get_cache_expiration($id, $prefix['lang'], $prefix['manual_callback']);
-            if ($cache_expiration !== false) {
-                $html_content .= ' <span data-wpucacheblockscounterempty="' . __('Cache has expired', 'wpucacheblocks') . '">' . sprintf(__('Cache expires in %ss.', 'wpucacheblocks'), '<span data-wpucacheblockscounter="' . $cache_expiration . '">' . $cache_expiration . '</span>') . '</span>';
+
+            if ($this->cache_type != 'wp') {
+                $cache_expiration = $this->get_cache_expiration($id, $prefix['lang'], $prefix['manual_callback']);
+                if ($cache_expiration !== false) {
+                    $html_content .= ' <span data-wpucacheblockscounterempty="' . __('Cache has expired', 'wpucacheblocks') . '">' . sprintf(__('Cache expires in %ss.', 'wpucacheblocks'), '<span data-wpucacheblockscounter="' . $cache_expiration . '">' . $cache_expiration . '</span>') . '</span>';
+                }
             }
         } else {
             $html_content .= __('Block is not cached.', 'wpucacheblocks');
