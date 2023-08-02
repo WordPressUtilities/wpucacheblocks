@@ -3,15 +3,27 @@
 /*
 Plugin Name: WPU Cache Blocks
 Description: Cache blocks
-Version: 1.1.0
+Version: 1.2.0
 Author: Darklg
-Author URI: http://darklg.me/
+Author URI: https://darklg.me/
+Text Domain: wpucacheblocks
+Domain Path: /lang
+Requires at least: 6.2
+Requires PHP: 8.0
 License: MIT License
-License URI: http://opensource.org/licenses/MIT
+License URI: https://opensource.org/licenses/MIT
 */
 
 class WPUCacheBlocks {
-    private $version = '1.1.0';
+    public $plugin_description;
+    public $settings_details;
+    public $settings;
+    public $config;
+    public $config__disable;
+    public $config__disable_admins;
+    public $messages;
+    public $adminpages;
+    private $version = '1.2.0';
     private $blocks = array();
     private $cached_blocks = array();
     private $reload_hooks = array();
@@ -36,7 +48,11 @@ class WPUCacheBlocks {
 
     public function plugins_loaded__main() {
 
-        load_plugin_textdomain('wpucacheblocks', false, dirname(plugin_basename(__FILE__)) . '/lang/');
+        $lang_dir = dirname(plugin_basename(__FILE__)) . '/lang/';
+        if (!load_plugin_textdomain('wpucacheblocks', false, $lang_dir)) {
+            load_muplugin_textdomain('wpucacheblocks', $lang_dir);
+        }
+        $this->plugin_description = __('Cache blocks', 'wpucacheblocks');
 
         // Options
         $this->options = array(
@@ -94,14 +110,14 @@ class WPUCacheBlocks {
     public function plugins_loaded() {
 
         // Messages
-        include 'inc/WPUBaseMessages/WPUBaseMessages.php';
+        include dirname(__FILE__) . '/inc/WPUBaseMessages/WPUBaseMessages.php';
         $this->messages = new \wpucacheblocks\WPUBaseMessages($this->options['id']);
 
         if (!is_admin()) {
             return;
         }
 
-        include 'inc/WPUBaseAdminPage/WPUBaseAdminPage.php';
+        include dirname(__FILE__) . '/inc/WPUBaseAdminPage/WPUBaseAdminPage.php';
         $admin_pages = array(
             'main' => array(
                 'icon_url' => 'dashicons-tagcloud',
@@ -144,7 +160,7 @@ class WPUCacheBlocks {
             )
         );
 
-        include 'inc/WPUBaseSettings/WPUBaseSettings.php';
+        include dirname(__FILE__) . '/inc/WPUBaseSettings/WPUBaseSettings.php';
         $settings_obj = new \wpucacheblocks\WPUBaseSettings($this->settings_details, $this->settings);
 
         ## if no auto create_page and medias ##

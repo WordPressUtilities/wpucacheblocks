@@ -1,20 +1,23 @@
 <?php
-
 namespace wpucacheblocks;
 
 /*
 Class Name: WPU Base Admin page
 Description: A class to handle pages in WordPress
-Version: 1.5
+Version: 1.5.1
+Class URI: https://github.com/WordPressUtilities/wpubaseplugin
 Author: Darklg
-Author URI: http://darklg.me/
+Author URI: https://darklg.me/
 License: MIT License
-License URI: http://opensource.org/licenses/MIT
+License URI: https://opensource.org/licenses/MIT
 */
 
 class WPUBaseAdminPage {
 
     public $page_hook = false;
+    private $pages;
+    private $options;
+    private $prefix;
 
     public function __construct() {}
 
@@ -51,7 +54,7 @@ class WPUBaseAdminPage {
                 foreach ($p['actions'] as $action) {
                     add_action($action[0], $action[1]);
                 }
-                foreach ($p['filters'] as $$filter) {
+                foreach ($p['filters'] as $filter) {
                     add_filter($filter[0], $filter[1]);
                 }
             }
